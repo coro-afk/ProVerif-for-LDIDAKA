@@ -1,5 +1,7 @@
 (* A Lightweight Dynamic ID-based Authenticated Key Agreement*) 
-(* This code is based on ''Abbasinezhad-Mood, Dariush, et al. "Efficient provably-secure dynamic ID-based authenticated key agreement scheme with enhanced security provision." IEEE Transactions on Dependable and Secure Computing (2020).'' *)
+(* This code is based on ''Abbasinezhad-Mood, Dariush, et al. 
+"Efficient provably-secure dynamic ID-based authenticated key agreement scheme with enhanced security provision." 
+IEEE Transactions on Dependable and Secure Computing (2020).'' *)
 
 (* Channel Definition *)
 free S_U_secure_net : channel [private]. (* Secure channel between server and user *)
@@ -22,6 +24,7 @@ fun Hash1(bitstring) : bitstring. (* One‐input Hash *)
 fun Hash3(bitstring, bitstring, bitstring) : bitstring. (* Three‐input Hash *)
 fun Hash4(bitstring, bitstring, bitstring, bitstring) : bitstring. (* Four‐input Hash *)
 fun Hash5(bitstring, bitstring, bitstring, bitstring, bitstring) : bitstring. (* Five‐input Hash *)
+fun Hash6(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring) : bitstring. (* Six‐input Hash *)
 fun Hash7(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring, bitstring) :bitstring. (* Seven‐input Hash *)
 fun XOR(bitstring, bitstring) : bitstring. (* Exclusive OR *)
 fun ScalarMul(bitstring, bitstring) : bitstring. (* EC point multiplication *)
@@ -88,7 +91,7 @@ let temp2 = ConcatTwo(xIDu, bs_new) in
 let DIDu_new = Enc(temp2, sk) in
 let XDIDu_new = XOR(Hash1(SKscr_s), DIDu_new) in
 let Ms = XOR(Hash3(xXu0, XDIDu_new, xBIDu),B) in
-let Hs = Hash5(xXu0, Ms, DIDu_new, SKscr_s, xTSscr) in
+let Hs = Hash6(xXu0, Ms, DIDu_new, SKscr_s, xTSscr, xIDu) in
 event Server_Responds_User (DIDu_new, B, Hs);
 out (S_U_public_net, (XDIDu_new, Ms, Hs));
 in (S_U_public_net, (xHscr_ack : bitstring));
@@ -127,7 +130,7 @@ let xB = DXOR(xMs,Hash3(xXu0, xXDIDu_new, xBIDu)) in
 let SKscr_s = Hash4(A,xB,xPK,TSscr) in
 out (S_U_public_net, Enc(SK, SKscr_s));
 let xDIDu_new = DXOR(xXDIDu_new, Hash1(SKscr_s)) in
-let xxHs = Hash5(xXu0, xMs, xDIDu_new, SKscr_s, TSscr) in
+let xxHs = Hash6(xXu0, xMs, xDIDu_new, SKscr_s, TSscr, IDu) in
 if (xxHs = xHs) then
 let Hscr_ack = Hash3(SKscr_s, IDu, TSscr) in
 out (S_U_public_net, (Hscr_ack));
@@ -135,6 +138,5 @@ event User_Accepts_Key (xDIDu_new, xB, xHs);
 0.
 process 
   ((!pS) | (!pU))  (* Comment in case of the perfect forward secrecy check*)
-  (* ((!pS) | (!pU)| (phase 1 ; out (S_U_public_net, (sk, PWu, IDu)))) *) (* Uncomment 
-to check the perfect forward secrecy *)
+  (* ((!pS) | (!pU)| (phase 1 ; out (S_U_public_net, (sk, PWu, IDu)))) *) (* Uncomment to check the perfect forward secrecy *)
 
