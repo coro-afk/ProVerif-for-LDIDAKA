@@ -1,0 +1,140 @@
+(* A Lightweight Dynamic ID-based Authenticated Key Agreement*) 
+(* This code is based on ''Abbasinezhad-Mood, Dariush, et al. "Efficient provably-secure dynamic ID-based authenticated key agreement scheme with enhanced security provision." IEEE Transactions on Dependable and Secure Computing (2020).'' *)
+
+(* Channel Definition *)
+free S_U_secure_net : channel [private]. (* Secure channel between server and user *)
+free S_U_public_net : channel.           (* Public channel between server and user *)
+
+(* Private Terms *)
+free IDu : bitstring [private]. (* Userʹs identifier *)
+free PWu : bitstring [private]. (* Userʹs password *)
+free SK : bitstring [private].  (* Shared session key *)
+free sk : bitstring [private].  (* Secret key of server *)
+
+(* Public Terms *)
+const G : bitstring.  (* Base point *)
+free IDsc : bitstring. (* SC identifier *)
+
+(* Functions *)
+fun ConcatTwo(bitstring, bitstring) : bitstring. (* Cncatenation *)
+fun Enc(bitstring, bitstring) : bitstring. (* Symmetric encryption *)
+fun Hash1(bitstring) : bitstring. (* One‐input Hash *)
+fun Hash3(bitstring, bitstring, bitstring) : bitstring. (* Three‐input Hash *)
+fun Hash4(bitstring, bitstring, bitstring, bitstring) : bitstring. (* Four‐input Hash *)
+fun Hash5(bitstring, bitstring, bitstring, bitstring, bitstring) : bitstring. (* Five‐input Hash *)
+fun Hash7(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring, bitstring) :bitstring. (* Seven‐input Hash *)
+fun XOR(bitstring, bitstring) : bitstring. (* Exclusive OR *)
+fun ScalarMul(bitstring, bitstring) : bitstring. (* EC point multiplication *)
+
+(* Destructobs *)
+reduc forall m1 : bitstring, key : bitstring; Dec(Enc(m1, key), key) = m1. 
+reduc forall m1 : bitstring, m2 : bitstring; Separate1(ConcatTwo(m1, m2)) = m1.
+reduc forall m1 : bitstring, m2 : bitstring; Separate2(ConcatTwo(m1, m2)) = m2.
+reduc forall m1 : bitstring, m2 : bitstring; DXOR(XOR(m1, m2), m1) = m2.
+
+(* Equations *)
+equation forall m1 : bitstring, m2 : bitstring; XOR(m1, m2) = XOR(m2, m1).
+
+(* queries *)
+(* query attacker (new beta). *)   (* Uncomment when checking KSSTIA resistance *)
+(* query attacker (new alpha). *) (* Uncomment when checking KSSTIA resistance *)
+query attacker (SK).             (* A query to check the secrecy of generated session key *)
+noninterf IDu.                   (* A query to check the strong anonymity of user *)
+weaksecret PWu.  (* A query to check the resistance against the offline password guessing attack *)
+query m1 : bitstring, m2 : bitstring, m3: bitstring, m4 : bitstring; inj-event (Server_Accepts_Key (m1, m2, m3, m4)) 
+==> inj-event (User_Requests_Authentication (m1, m2, m3, m4)).
+query m1 : bitstring, m2 : bitstring, m3: bitstring; inj-event (User_Accepts_Key (m1, m2, m3)) 
+==> inj-event (Server_Responds_User (m1, m2, m3)).
+
+(* Events *)
+event User_Requests_Authentication (bitstring, bitstring, bitstring, bitstring).
+event Server_Accepts_Key (bitstring, bitstring, bitstring, bitstring).
+event Server_Responds_User (bitstring, bitstring, bitstring).
+event User_Accepts_Key (bitstring, bitstring, bitstring).
+
+(* Server process *)
+let pS=
+(* Registration *)
+new as : bitstring;
+new bs : bitstring;
+new beta : bitstring; (* Session ephemeral secret *)
+(* out (S_U_public_net, (beta));*) (* Uncomment to check the KSSTIA resistance *)
+new bs_new : bitstring;
+(*new TSscr : bitstring;*)
+let PK = ScalarMul(sk, G) in
+in (S_U_secure_net, (AIDu : bitstring, BIDu : bitstring));
+let Xu0 = Hash3(IDu, sk, as) in
+let Xu1 = XOR(AIDu, Xu0) in
+let Xu2 = XOR(Hash1(AIDu), PK) in
+let temp0 = ConcatTwo(IDu, bs) in
+let EBu1 = Enc(BIDu, Xu0) in
+let DIDu = Enc(temp0, sk) in
+(*  out  (S_U_public_net,  (sk)); *)  (*  Uncomment  to  check  the  KCIA resistance *)
+out (S_U_secure_net, (Xu1, Xu2, DIDu));
+(* Login and key agreement *)
+in (S_U_public_net, (xDIDu : bitstring, xMscr : bitstring, xHscr : bitstring, xTSscr : bitstring));
+let temp1 = Dec(xDIDu, sk) in
+let xIDu = Separate1(temp1) in
+let xbs = Separate2(temp1) in
+let xXu0 = Hash3(xIDu, sk, as) in
+let xBIDu = Dec(EBu1, xXu0) in
+let xxHscr = Hash7(xIDu, IDsc, xXu0, xMscr, xTSscr, PK, xBIDu) in 
+if (xHscr = xxHscr) then
+let xA = DXOR(xMscr,Hash3(xXu0, xDIDu, xBIDu)) in
+let B = Hash3(as,bs,beta) in
+let SKscr_s = Hash4(xA,B,PK,xTSscr) in
+out (S_U_public_net, Enc(SK, SKscr_s));
+let temp2 = ConcatTwo(xIDu, bs_new) in
+let DIDu_new = Enc(temp2, sk) in
+let XDIDu_new = XOR(Hash1(SKscr_s), DIDu_new) in
+let Ms = XOR(Hash3(xXu0, XDIDu_new, xBIDu),B) in
+let Hs = Hash5(xXu0, Ms, DIDu_new, SKscr_s, xTSscr) in
+event Server_Responds_User (DIDu_new, B, Hs);
+out (S_U_public_net, (XDIDu_new, Ms, Hs));
+in (S_U_public_net, (xHscr_ack : bitstring));
+let xxHscr_ack = Hash3(SKscr_s, xIDu, xTSscr) in
+if (xHscr_ack = xxHscr_ack) then
+event Server_Accepts_Key (IDu, xA, xHscr, xTSscr);
+0.
+
+(* User process *)
+let pU=
+(* Registration *)
+new au : bitstring;
+new bu : bitstring;
+new alpha : bitstring; (* Session ephemeral secret *)
+(* out (S_U_public_net, (alpha)); *) (* Uncomment to check the KSSTIA resistance *)
+new TSscr : bitstring;
+let AIDu = Hash3(IDu, PWu, au) in
+let BIDu = Hash3(IDu, PWu, bu) in
+out (S_U_secure_net, (AIDu, BIDu));
+in (S_U_secure_net, (Xu1 : bitstring, Xu2 : bitstring, DIDu : bitstring));
+let temp0 = ConcatTwo(bu, BIDu) in
+let EBU2 = Enc(temp0, Hash1(PWu)) in
+(* Login and key agreement *)
+let xXu0 = DXOR(Xu1, AIDu) in
+let xPK = DXOR(Xu2, Hash1(AIDu)) in
+let temp1 = Dec(EBU2, Hash1(PWu)) in
+let xbu = Separate1(temp1) in
+let xBIDu = Separate2(temp1) in
+let A = Hash3(PWu,xbu,alpha) in
+let Mscr = XOR(Hash3(xXu0, DIDu, xBIDu),A) in
+let Hscr = Hash7(IDu, IDsc, xXu0, Mscr, TSscr, xPK, xBIDu) in 
+event User_Requests_Authentication (IDu, A, Hscr, TSscr);
+out (S_U_public_net, (DIDu, Mscr, Hscr, TSscr));
+in (S_U_public_net, (xXDIDu_new : bitstring, xMs : bitstring, xHs : bitstring));
+let xB = DXOR(xMs,Hash3(xXu0, xXDIDu_new, xBIDu)) in
+let SKscr_s = Hash4(A,xB,xPK,TSscr) in
+out (S_U_public_net, Enc(SK, SKscr_s));
+let xDIDu_new = DXOR(xXDIDu_new, Hash1(SKscr_s)) in
+let xxHs = Hash5(xXu0, xMs, xDIDu_new, SKscr_s, TSscr) in
+if (xxHs = xHs) then
+let Hscr_ack = Hash3(SKscr_s, IDu, TSscr) in
+out (S_U_public_net, (Hscr_ack));
+event User_Accepts_Key (xDIDu_new, xB, xHs);
+0.
+process 
+  ((!pS) | (!pU))  (* Comment in case of the perfect forward secrecy check*)
+  (* ((!pS) | (!pU)| (phase 1 ; out (S_U_public_net, (sk, PWu, IDu)))) *) (* Uncomment 
+to check the perfect forward secrecy *)
+
